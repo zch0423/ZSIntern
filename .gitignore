@@ -1,0 +1,6 @@
+/recruitment
+/journal
+.DS_Store
+/__pycache__
+*.xlsx
+
