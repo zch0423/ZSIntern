@@ -11,7 +11,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 import scipy.signal as signal
-from random import sample
+from random import sample, randint
 from scipy.stats.mstats import winsorize
 
 def getNameByCode(code, data):
@@ -28,8 +28,6 @@ def getCompanyByCode(code, data):
     '''
     company = data[data["code"].str.contains(code)]
     y = company.iloc[0, 2:]
-    # 进行缩尾处理
-    # TODO
     return company, y
 
 
@@ -189,3 +187,96 @@ def selectCompanyByAbsDiff(diff, absDiff=1.7, threshold=0.3, order=3, minNum=40,
         if isGoodByAbsDiff(maxs, mins, absDiff=absDiff, threshold=threshold):
             goodCodes.append(code)
     return goodCodes, temp
+
+
+def isMinimum(p, minimum, precision=1e-4):
+    '''
+    Description:
+    判断极值点是不是极小值
+    ---
+    Params:
+    p, float
+    minimum, Series, 比较最后一个是不是极小值
+    ---
+    Returns:
+    bool, True means is minimum
+    '''
+    return abs(p-minimum[-1])<precision
+
+
+def markCompany(pExtr, pRoll, pRoe, minimum):
+    '''
+    Description:
+    给公司标记
+    L, low, 低位
+    H, high, 高位
+    I, increase, 上升期
+    D, decrease, 下降期
+    ---
+    Params:
+    pExtr, float, last extreme point
+    pRoll, float, last point on the rolling series
+    pRoe, float, last roe data
+    minimum, Series, minimum points list
+    ---
+    Returns:
+    mark, string, L H I D, 在中间的返回I* D*
+    '''
+    if isMinimum(pExtr, minimum):
+       # 判断是否是上升趋势，如果是下降趋势，则抛出异常
+        if pRoll < pExtr:
+            raise ValueError("异常")
+        # pRoll > pExtr
+        if pRoe > pRoll:
+            return "I"
+        elif pRoe < pExtr:
+            return "L"
+        else:
+            return "I*"
+    else:
+        if pRoll > pExtr:
+            raise ValueError("异常")
+        # pRoll<pExtr
+        if pRoe < pRoll:
+            return "D"
+        elif pRoe > pExtr:
+            return "H"
+        else:
+            return "D*"
+
+
+def markCompanies(companies):
+    '''
+    Description:
+    给所有的公司标记，返回一个DataFrame包含code name mark
+    ---
+    Params:
+    companies, DataFrame, 差分公司roe数据
+    ---
+    Returns:
+    marked, DataFrame, columns = [code name mark]
+    '''
+    marks = []
+    codes = companies.code.values
+    names = companies.name.values
+    for code in codes:
+        company, y = getCompanyByCode(code, companies)
+        yRolling = getYRolling(y)
+        maxIdx, minIdx = getExtreme(yRolling, order=3)
+        maximum, minimum = yRolling[maxIdx], yRolling[minIdx]
+        minMax = pd.concat([maximum, minimum]).sort_index()
+        pExtr = minMax[-1]
+        pRoll = yRolling[~yRolling.isnull()][-1]  # 最后一个rolling
+        pRoe = company.iloc[0, -1]  # roe 数据中最后一个点
+        marks.append(markCompany(pExtr, pRoll, pRoe, minimum))
+    return pd.DataFrame(data={"code":codes, "name":names, "mark":marks})
+
+def main(path):
+    diff = pd.read_excel(path)  # 处理过的差分数据，包括winsorize等
+    df = markCompanies(diff)
+    # print(df)
+    df.to_excel("Jan18/marked.xlsx", index=False)
+
+if __name__ == "__main__":
+    main("Jan18/temp58Good.xlsx")
+
