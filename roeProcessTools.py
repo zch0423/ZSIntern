@@ -123,19 +123,19 @@ def preProcess(data, startYear=2000, endYear=2021):
     return data
 
 
-def winsorize(data, winsorize=True):
+def winsorize(data, winsorizeBool=True):
     '''
     Description:
     - winsorize
     ---
     Params:
     data, DataFrame
-    winsorize, bool default True
+    winsorizeBool, bool default True
     ---
     Returns:
     DataFrame
     '''
-    if winsorize:
+    if winsorizeBool:
         data.iloc[:, 2:] = data.iloc[:, 2:].apply(lambda x: np.clip(
             x, np.nanquantile(x, 0.05), np.nanquantile(x, 0.95)), axis=1)
     return data
@@ -409,6 +409,25 @@ def selectGood(data, n=1.5, minExtreme=4, proportion=0.2):
     return data[goodOrNots]
 
 
+def clean(data, startYear=2000, endYear=2021, minNum=40, winsorizeBool=True):
+    '''
+    Description:
+    数据处理的封装
+    清洗数据，返回winsorized之后的数据
+    ---
+    Params:
+    data, DataFrame
+    startYear, endYear, minNum, winsorizeBool
+    ---
+    Returns:
+    DataFrame
+    '''
+    data = preProcess(data, startYear=startYear, endYear=endYear)
+    data = removeLessThan(data, minNum=minNum)
+    data = winsorize(data, winsorizeBool=winsorizeBool)
+    return data
+
+
 def main(filePath, export=False, dirPath="test"):
     '''
     Description: test function
@@ -431,9 +450,11 @@ def main(filePath, export=False, dirPath="test"):
     data = removeLessThan(data, minNum=40)
     if export:
         data.to_excel(f"{dirPath}预处理暂存.xlsx", index=False)
-    data = winsorize(data, winsorize=True)
+    data = winsorize(data, winsorizeBool=True)
     if export:
         data.to_excel(f"{dirPath}winsorized.xlsx", index=False)
+
+
     # 比行业均值大的
     data = greaterThanStd(data, n=8, gaussian=True, center=True)
     if export:
@@ -446,9 +467,6 @@ def main(filePath, export=False, dirPath="test"):
     marked = markCompanies(selected)
     if export:
         marked.to_excel(f"{dirPath}marked.xlsx", index=False)
-
-
-
 
 if __name__ == '__main__':
     filePath = "Jan14/机械设备roe单季度.xlsx"

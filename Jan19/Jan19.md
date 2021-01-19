@@ -1,3 +1,51 @@
+Jan 19, 2021 16:01
+
+判定改进思路
+
+不只用最后一季度的roe，尝试改用最后几个季度的roe数据短期的消除干扰？
+
+可以用历史的数据来判定是否有效
+
+- 比如已经知道2011-2016一直在跌，那么用2011为止的数据，给定2012，2013判定是否在跌
+
+需要判定的点离极值点越靠近，则确定性越弱；但离得越远，及时性不足
+
+- 确定性和及时性似乎不可兼得，如何balance？
+
+
+
+Jan 19, 2021 15:51
+
+化工行业
+
+002037.SZ 判定是在高位，但从长时间跨度来看应该是在低位？
+
+<img src="/Users/zch/Library/Application Support/typora-user-images/image-20210119155135067.png" alt="image-20210119155135067" style="zoom:50%;" />
+
+
+
+
+
+人为缩短时间跨度，测试能不能较早找到
+
+<img src="/Users/zch/Library/Application Support/typora-user-images/image-20210119155403070.png" alt="image-20210119155403070" style="zoom:50%;" />
+
+
+
+<img src="/Users/zch/Library/Application Support/typora-user-images/image-20210119155528166.png" alt="image-20210119155528166" style="zoom:50%;" />
+
+
+
+
+
+
+
+
+
+
+
+---
+
 - winsorizedRoe.xlsx，初步筛选过的roe数据
     - 无ST
     - 去除空列
