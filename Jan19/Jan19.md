@@ -3,7 +3,9 @@
     - 去除空列
     - 5-95 winsorized
     - 去除不连续
-- std2p02.xlsx
+- roeMarked 根据绝对规则筛选roe的结果，obsolete
+- diffMarked 差分结果, obsolete
+- std2p02.xlsx☑️
     - 按高于2个std且比例超过0.2筛选后的公司mark
 
 

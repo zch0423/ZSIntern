@@ -113,7 +113,7 @@ def isGoodByAbsDiff(maxs, mins, absDiff=2, threshold=0.3):
     return (minMaxDiff > absDiff).sum() > threshold*(len(minMaxDiff)-1)
 
 
-def isGoodByRelDiff(maximum, minimum, std, n=1.5, minExtreme=4):
+def isGoodByRelDiff(maximum, minimum, std, n=1.5, minExtreme=4, proportion=0.5):
     '''
     Description:
     通过相对差值选择公司，极值个数不少于minExtreme，却存在超过n个std的极值差
@@ -124,16 +124,16 @@ def isGoodByRelDiff(maximum, minimum, std, n=1.5, minExtreme=4):
     std, float, std for yRolling
     n, float, std times
     minExtreme, int, number of minimum tolerant extreme points
+    proportion, float, 极值差超过n个std的比例
     ---
     Returns:
     bool, True means good 
     '''
     minMax = pd.concat([maximum, minimum]).sort_index()
-    if len(minMax)<minExtreme:
+    if len(minMax) < minExtreme:
         return False
     minMaxDiff = np.abs(minMax.diff(1))  # 相邻极值点的差值
-    return (minMaxDiff>=n*std).sum()>0
-    
+    return (minMaxDiff >= n*std).sum() >= (proportion*(len(minMax)-1))
 
 
 def isContinuous(x):
@@ -289,12 +289,12 @@ def markCompanies(companies):
         pExtr = minMax[-1]
         pRoll = yRolling[~yRolling.isnull()][-1]  # 最后一个rolling
         pRoe = company.iloc[0, -1]  # roe 数据中最后一个点
-
-        try:
-            marks.append(markCompany(pExtr, pRoll, pRoe, minimum))
-        except ValueError:
-            marks.append("")
-            print(company.iloc[0, :2])
+        #TODO 没有ValueError
+        # try:
+        marks.append(markCompany(pExtr, pRoll, pRoe, minimum))
+        # except ValueError:
+        # marks.append("")
+        # print(company.iloc[0, :2])
     return pd.DataFrame(data={"code":codes, "name":names, "mark":marks})
 
 def main(path):
