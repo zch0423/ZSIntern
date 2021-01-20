@@ -24,6 +24,8 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import scipy.signal as signal
 from random import sample
+from matplotlib.font_manager import FontProperties
+zhfont = FontProperties(fname="/System/Library/Fonts/PingFang.ttc")
 
 
 def getNameByCode(code, data):
@@ -200,19 +202,19 @@ def greaterThanStd(data, n=8, gaussian=True, center=True):
     return data[stds>avgStd]
 
 
-def getExtreme(yRolling, order=3):
+def getExtreme(yRolling, order=4):
     '''
     Description:
     返回极值下标
     ---
     Params:
     yRolling, Series
-    order, int default 3, 极值计算规则比相邻order要大
+    order, int default 4, 极值计算规则比相邻order要大
     ---
     Returns:
     maxIdx, minIdx, 下标
     '''
-    y = np.array(yRolling)
+    y = np.array(yRolling[~yRolling.isnull()])  # 去除NaN不然可能在端点得不到极值
     maxIdx = signal.argrelextrema(y, np.greater_equal, order=order)[0]
     minIdx = signal.argrelextrema(y, np.less_equal, order=order)[0]
     return maxIdx, minIdx
@@ -256,7 +258,7 @@ def isMinimum(p, minimum, precision=1e-4):
     return abs(p-minimum[-1]) < precision
 
 
-def markCompany(pExtr, pRoll, pRoe, minimum):
+def markCompany(pExtr, pRoll, pRoe, minimum, maximum):
     '''
     Description:
     给公司标记
@@ -270,40 +272,54 @@ def markCompany(pExtr, pRoll, pRoe, minimum):
     pRoll, float, last point on the rolling series
     pRoe, float, last roe data
     minimum, Series, minimum points list
+    maximum, Series, maximum points list
     ---
     Returns:
-    mark, string, L H I D, 在中间的返回I* D*
+    mark, string, L H I D, 在中间的返回
     '''
     if isMinimum(pExtr, minimum):
-       # 判断是否是上升趋势，如果是下降趋势，则抛出异常
+        # 判断是否是上升趋势，如果是下降趋势，则抛出异常
+        # 先判断极值点是否是平滑曲线最后的点
+        if isMinimum(pRoll, minimum):
+            if pRoe < pRoll:
+                return "D"  # 最后一个是极小值
+            else:
+                return "L/I"  # 不确定 低位或上升
         if pRoll < pExtr:
-            raise ValueError("异常")
+            raise ValueError("异常，小于极小值")
         # pRoll > pExtr
         if pRoe > pRoll:
             return "I"
         elif pRoe < pExtr:
-            return "L"
+            return "L/D"  # 不确定 低位或继续下降
         else:
-            return "I*"
+            return "L/I"  # 不确定 低位或上升
     else:
+        if isMinimum(pRoll, maximum):
+            if pRoe > pRoll:
+                return "I"
+            else:
+                return "H/D"
+
         if pRoll > pExtr:
-            raise ValueError("异常")
+            raise ValueError("异常，大于极大值")
         # pRoll<pExtr
         if pRoe < pRoll:
             return "D"
         elif pRoe > pExtr:
-            return "H"
+            return "H/I"  # 高位或继续上升
         else:
-            return "D*"
+            return "H/D"  # 高位或下降
 
 
-def markCompanies(companies):
+def markCompanies(companies, order=4):
     '''
     Description:
     给所有的公司标记，返回一个DataFrame包含code name mark
     ---
     Params:
     companies, DataFrame, 差分公司roe数据
+    order, int default 4
     ---
     Returns:
     marked, DataFrame, columns = [code name mark]
@@ -314,22 +330,23 @@ def markCompanies(companies):
     for code in codes:
         company, y = getCompanyByCode(code, companies)
         yRolling = getYRolling(y)
-        maxIdx, minIdx = getExtreme(yRolling, order=3)
+        yRolling = yRolling[~yRolling.isnull()]
+        maxIdx, minIdx = getExtreme(yRolling, order=order)
         maximum, minimum = yRolling[maxIdx], yRolling[minIdx]
         minMax = pd.concat([maximum, minimum]).sort_index()
         pExtr = minMax[-1]
-        pRoll = yRolling[~yRolling.isnull()][-1]  # 最后一个rolling
+        pRoll = yRolling[-1]  # 最后一个rolling
         pRoe = company.iloc[0, -1]  # roe 数据中最后一个点
         #TODO 没有ValueError
         try:
-            marks.append(markCompany(pExtr, pRoll, pRoe, minimum))
+            marks.append(markCompany(pExtr, pRoll, pRoe, minimum, maximum))
         except ValueError:
             marks.append("")
             print(company.iloc[0, :2])
     return pd.DataFrame(data={"code": codes, "name": names, "mark": marks})
 
 
-def drawROEandExtreme(maxs, mins, y, yRolling, company, minBool=True, maxBool=True, roeBool=True):
+def drawROEandExtreme(maxs, mins, y, yRolling, company, minBool=True, maxBool=True, roeBool=True, mark=None):
     '''
     Description:
     绘制ROE，平滑线和标注极点
@@ -343,15 +360,18 @@ def drawROEandExtreme(maxs, mins, y, yRolling, company, minBool=True, maxBool=Tr
     minBool, bool default True, 是否标注极小值
     maxBool, bool default True, 是否标注极大值
     roeBool, bool default True, 是否显示roe
+    mark, default None, 如果有传入为标记上升或下降
     ---
     Returns:
     '''
     fig, axs = plt.subplots(figsize=(12, 5))
-    x = [datetime.strptime(d, '%Y-%m').date() for d in company.columns[2:]]
+    
     # y = company.iloc[0, 2:]
     if roeBool:
+        x = [datetime.strptime(d, '%Y-%m').date() for d in company.columns[2:]]
         axs.plot(x, y, label="roe")
-    axs.plot(x, yRolling, label="roll")
+    xRoll = [datetime.strptime(d, '%Y-%m').date() for d in yRolling.index]
+    axs.plot(xRoll, yRolling, label="roll")
     xMax = [datetime.strptime(d, '%Y-%m').date() for d in maxs.index]
     xMin = [datetime.strptime(d, '%Y-%m').date() for d in mins.index]
     axs.scatter(xMax, maxs, label="max", c='r')
@@ -362,14 +382,19 @@ def drawROEandExtreme(maxs, mins, y, yRolling, company, minBool=True, maxBool=Tr
     if minBool:
         for i, tempX in enumerate(xMin):
             axs.annotate(str(tempX)[:-3], xy=(tempX, mins[i]-0.1), c="g")
-    axs.set_title(company.iloc[0, 0])  # code
-    fig.legend()
+    title = company.iloc[0, 0]+"  "+company.iloc[0, 1]
+    if mark:
+        title += "  "+mark
+    axs.set_title(title, fontproperties=zhfont)  # code
+    axs.legend()
 
 
-def showOne(code, data, n=8, gaussian=True, center=True, order=3, maxBool=True, minBool=True, roeBool=True):
+def showOne(code, data, marked=None, n=8, gaussian=True, center=True, order=4, maxBool=True, minBool=True, roeBool=True):
     '''
     Description:
     根据code绘制某一公司的roe，趋势以及极值点，为drawROEandExtreme的封装
+    Jan 20, 2021 16:30
+    增加了mark标注在title上
     ---
     Params:
     code, string
@@ -379,10 +404,15 @@ def showOne(code, data, n=8, gaussian=True, center=True, order=3, maxBool=True, 
     '''
     company, y = getCompanyByCode(code, data)
     yRolling = getYRolling(y, n=n, gaussian=gaussian, center=center)
+    yRolling = yRolling[~yRolling.isnull()]
     maximum, minimum = getExtreme(yRolling, order)
     maxs, mins = yRolling[maximum], yRolling[minimum]
+    mark = None
+    if marked is not None:
+        _, mark = getCompanyByCode(code, marked)
+        mark = mark[0]
     drawROEandExtreme(maxs, mins, y, yRolling, company,
-                      maxBool, minBool, roeBool)
+                      maxBool, minBool, roeBool, mark)
 
 
 def selectGood(data, n=1.5, minExtreme=4, proportion=0.2):
@@ -401,6 +431,7 @@ def selectGood(data, n=1.5, minExtreme=4, proportion=0.2):
     for code in codes:
         company, y = getCompanyByCode(code, data)
         yRolling = getYRolling(y)
+        yRolling = yRolling[~yRolling.isnull()]
         maxIdx, minIdx = getExtreme(yRolling)
         maximum, minimum = yRolling[maxIdx], yRolling[minIdx]
         std = np.std(yRolling, ddof=1)
@@ -409,7 +440,7 @@ def selectGood(data, n=1.5, minExtreme=4, proportion=0.2):
     return data[goodOrNots]
 
 
-def clean(data, startYear=2000, endYear=2021, minNum=40, winsorizeBool=True):
+def clean(data, startYear=2000, endYear=2021, minNum=32, winsorizeBool=True):
     '''
     Description:
     数据处理的封装
