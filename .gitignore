@@ -6,3 +6,5 @@
 /test
 /data
 *.docx
+/.vscode
+会议记录.*
