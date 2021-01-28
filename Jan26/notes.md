@@ -1,10 +1,6 @@
-树回归/分段线性回归
+树回归/分段线性回归[树回归][https://blog.csdn.net/xieyan0811/article/details/78581974]
 
-facebook prophet
-
-[树回归][https://blog.csdn.net/xieyan0811/article/details/78581974]
-
-
+~~facebook prophet~~
 
 ## 解决思路 Jan 26, 2021 14:51
 
