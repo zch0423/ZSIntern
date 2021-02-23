@@ -23,7 +23,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 import scipy.signal as signal
-from random import sample
 from matplotlib.font_manager import FontProperties
 zhfont = FontProperties(fname="/System/Library/Fonts/PingFang.ttc")
 
@@ -120,6 +119,11 @@ def preProcess(data, startYear=2000, endYear=2021):
     data = data[~data["name"].str.contains("ST")]
     # 去除全为空的列，即没有数据的年份
     data.dropna(how="all", axis=1, inplace=True)
+    # 去除近年没有数据的公司
+    # 不能用最后一列，改用后两列
+    c1 = data.columns[-1]
+    c2 = data.columns[-2]
+    data = data[~((data[c1].isnull())&(data[c2].isnull()))] 
     # 去除不连续的公司，空缺roe不超过1
     data = data[data.apply(lambda x:isContinuous(x), axis=1)]
     return data
@@ -258,92 +262,154 @@ def isMinimum(p, minimum, precision=1e-4):
     return abs(p-minimum[-1]) < precision
 
 
-def markCompany(pExtr, pRoll, pRoe, minimum, maximum):
+def markCompany(yRolling, maximum, minimum, threshold=0.8, highPct=75):
     '''
     Description:
-    给公司标记
-    L, low, 低位
-    H, high, 高位
-    I, increase, 上升期
-    D, decrease, 下降期
+    标记公司
     ---
     Params:
-    pExtr, float, last extreme point
-    pRoll, float, last point on the rolling series
-    pRoe, float, last roe data
-    minimum, Series, minimum points list
-    maximum, Series, maximum points list
+    yRolling, Series, dropna already
+    maximum, 极大值点
+    minimum, 极小值点
+    threshold, default 0.8, 上升幅度超过threhold
+    highPct, default 75, 75分位点认为是高位
     ---
     Returns:
-    mark, string, L H I D, 在中间的返回
+    mark, string
     '''
-    if isMinimum(pExtr, minimum):
-        # 判断是否是上升趋势，如果是下降趋势，则抛出异常
-        # 先判断极值点是否是平滑曲线最后的点
-        if isMinimum(pRoll, minimum):
-            if pRoe < pRoll:
-                return "D"  # 最后一个是极小值
-            else:
-                return "L/I"  # 不确定 低位或上升
-        if pRoll < pExtr:
-            raise ValueError("异常，小于极小值")
-        # pRoll > pExtr
-        if pRoe > pRoll:
-            return "I"
-        elif pRoe < pExtr:
-            return "L/D"  # 不确定 低位或继续下降
-        else:
-            return "L/I"  # 不确定 低位或上升
-    else:
-        if isMinimum(pRoll, maximum):
-            if pRoe > pRoll:
-                return "I"
-            else:
-                return "H/D"
-
-        if pRoll > pExtr:
-            raise ValueError("异常，大于极大值")
-        # pRoll<pExtr
-        if pRoe < pRoll:
-            return "D"
-        elif pRoe > pExtr:
-            return "H/I"  # 高位或继续上升
-        else:
-            return "H/D"  # 高位或下降
+    pRoll = yRolling[-1]
+    if not isMinimum(pRoll, maximum):
+        return "非连续上升"
+    high = np.percentile(yRolling, highPct)
+    pMin = minimum[-1]
+    if pMin > high:
+        return "高位低点"
+    # 上升超过threshold
+    if pRoll - pMin < threshold:
+        return "上升没超过阈值"
+    return "I"
 
 
-def markCompanies(companies, order=4):
+def mark(df, n=8, center=False, gaussian=True, order=4, threshold=0.8, highPct=75, increaseBool=True):
     '''
     Description:
-    给所有的公司标记，返回一个DataFrame包含code name mark
+    对DataFrame中所有公司进行标记，并返回标记和开始上升时间
     ---
     Params:
-    companies, DataFrame, 差分公司roe数据
-    order, int default 4
+    n, int default 8, param for rolling
+    center, bool default False, param for rolling
+    gaussian, bool default True, gaussian filter or moving average
+    order, int default 4, param for argrelextreme
+    threshold, float default 0.8, threshold for increase
+    highPct, int default 75, percentile for high threshold
+    increaseBool, bool default True, whether only show increase marked companies
     ---
     Returns:
-    marked, DataFrame, columns = [code name mark]
+    DataFrame with four columns, code name mark startTime
     '''
+    codes = df.code.values
     marks = []
-    codes = companies.code.values
-    names = companies.name.values
+    startTime = []
     for code in codes:
-        company, y = getCompanyByCode(code, companies)
-        yRolling = getYRolling(y)
-        yRolling = yRolling[~yRolling.isnull()]
+        company, y = getCompanyByCode(code, df)
+        yRolling = getYRolling(y, n=n, gaussian=gaussian, center=center)
+        yRolling.dropna(inplace=True)
         maxIdx, minIdx = getExtreme(yRolling, order=order)
         maximum, minimum = yRolling[maxIdx], yRolling[minIdx]
-        minMax = pd.concat([maximum, minimum]).sort_index()
-        pExtr = minMax[-1]
-        pRoll = yRolling[-1]  # 最后一个rolling
-        pRoe = company.iloc[0, -1]  # roe 数据中最后一个点
-        #TODO 没有ValueError
-        try:
-            marks.append(markCompany(pExtr, pRoll, pRoe, minimum, maximum))
-        except ValueError:
-            marks.append("")
-            print(company.iloc[0, :2])
-    return pd.DataFrame(data={"code": codes, "name": names, "mark": marks})
+        marks.append(markCompany(yRolling, maximum, minimum))
+        startTime.append(minimum.index[-1])
+    temp = pd.DataFrame(data={"code": codes, "name": df.name.values, 
+                        "mark": marks,  "startTime": startTime})
+    return temp[temp["mark"]=="I"] if increaseBool else temp
+
+
+# 暂时不用，效果不好
+# def markCompany(pExtr, pRoll, pRoe, minimum, maximum):
+#     '''
+#     Description:
+#     给公司标记
+#     L, low, 低位
+#     H, high, 高位
+#     I, increase, 上升期
+#     D, decrease, 下降期
+#     ---
+#     Params:
+#     pExtr, float, last extreme point
+#     pRoll, float, last point on the rolling series
+#     pRoe, float, last roe data
+#     minimum, Series, minimum points list
+#     maximum, Series, maximum points list
+#     ---
+#     Returns:
+#     mark, string, L H I D, 在中间的返回
+#     '''
+#     if isMinimum(pExtr, minimum):
+#         # 判断是否是上升趋势，如果是下降趋势，则抛出异常
+#         # 先判断极值点是否是平滑曲线最后的点
+#         if isMinimum(pRoll, minimum):
+#             if pRoe < pRoll:
+#                 return "D"  # 最后一个是极小值
+#             else:
+#                 return "L/I"  # 不确定 低位或上升
+#         if pRoll < pExtr:
+#             raise ValueError("异常，小于极小值")
+#         # pRoll > pExtr
+#         if pRoe > pRoll:
+#             return "I"
+#         elif pRoe < pExtr:
+#             return "L/D"  # 不确定 低位或继续下降
+#         else:
+#             return "L/I"  # 不确定 低位或上升
+#     else:
+#         if isMinimum(pRoll, maximum):
+#             if pRoe > pRoll:
+#                 return "I"
+#             else:
+#                 return "H/D"
+
+#         if pRoll > pExtr:
+#             raise ValueError("异常，大于极大值")
+#         # pRoll<pExtr
+#         if pRoe < pRoll:
+#             return "D"
+#         elif pRoe > pExtr:
+#             return "H/I"  # 高位或继续上升
+#         else:
+#             return "H/D"  # 高位或下降
+
+
+# def markCompanies(companies, order=4):
+#     '''
+#     Description:
+#     给所有的公司标记，返回一个DataFrame包含code name mark
+#     ---
+#     Params:
+#     companies, DataFrame, 差分公司roe数据
+#     order, int default 4
+#     ---
+#     Returns:
+#     marked, DataFrame, columns = [code name mark]
+#     '''
+#     marks = []
+#     codes = companies.code.values
+#     names = companies.name.values
+#     for code in codes:
+#         company, y = getCompanyByCode(code, companies)
+#         yRolling = getYRolling(y)
+#         yRolling = yRolling[~yRolling.isnull()]
+#         maxIdx, minIdx = getExtreme(yRolling, order=order)
+#         maximum, minimum = yRolling[maxIdx], yRolling[minIdx]
+#         minMax = pd.concat([maximum, minimum]).sort_index()
+#         pExtr = minMax[-1]
+#         pRoll = yRolling[-1]  # 最后一个rolling
+#         pRoe = company.iloc[0, -1]  # roe 数据中最后一个点
+#         #TODO 没有ValueError
+#         try:
+#             marks.append(markCompany(pExtr, pRoll, pRoe, minimum, maximum))
+#         except ValueError:
+#             marks.append("")
+#             print(company.iloc[0, :2])
+#     return pd.DataFrame(data={"code": codes, "name": names, "mark": marks})
 
 
 def drawROEandExtreme(maxs, mins, y, yRolling, company, minBool=True, maxBool=True, roeBool=True, mark=None):
