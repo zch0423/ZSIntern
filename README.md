@@ -39,3 +39,6 @@
 
 ## Feb 23
 - [x] Cash flow data
+
+## Mar2
+- [x] 检验roe和cf的有效性 
