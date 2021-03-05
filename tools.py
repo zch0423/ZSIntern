@@ -14,7 +14,7 @@ import numpy as np
 from scipy.stats import spearmanr
 import os
 import tushare as ts
-token = "a7c1312fe8187bff67ada6333c4b447caff18f58be66ac8b64d20d5a"
+token = "your token here"
 api = ts.pro_api(token)
 
 
