@@ -98,7 +98,7 @@ def getEarlyTime(time1: str, time2: str):
     return time1 if time1 < time2 else time2
 
 
-def plotIt(code, df: pd.DataFrame, mark: pd.DataFrame, title:str ="roe"):
+def plotIt(code, df: pd.DataFrame, mark: pd.DataFrame, title:str ="roe", startYear:str ="2012"):
     '''
     Description:
     绘制股价和roe或cf等数据的图表
@@ -107,6 +107,7 @@ def plotIt(code, df: pd.DataFrame, mark: pd.DataFrame, title:str ="roe"):
     df, DataFrame, roe 或cf数据
     mark, DataFrame, 标记数据
     title, str, 标记信息
+    startYear, str default 2012, 开始绘制数据的年份
     ---
     Returns:
     '''
@@ -120,10 +121,10 @@ def plotIt(code, df: pd.DataFrame, mark: pd.DataFrame, title:str ="roe"):
     price["trade_date"] = pd.to_datetime(price["trade_date"], format="%Y%m%d")
     yPrice = price["close"]
     xPrice = [each.date() for each in price["trade_date"]]
-    # 获取公司数据信息，取2010-03之后的数据
+    # 获取公司数据信息，取year-03之后的数据
     company = df[df["code"].str.contains(code)]
     company = company.dropna(axis=1)
-    idx = company.columns.get_indexer(("2010-03",))[0]
+    idx = company.columns.get_indexer((f"{startYear}-03",))[0]
     temp = pd.concat([company.iloc[:, :2], company.iloc[:, idx:]], axis=1)
     fig, axs = showOne(code, temp, marked=title, center=False)
     ax2 = axs.twinx()
