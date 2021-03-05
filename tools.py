@@ -8,7 +8,9 @@
     - getPriceData 从tushare获取股价
     - getEarlyTime 比较两个日期获取早的
     - correlate 返回roe或cf和price的pearson和spearman相关系数
+    - plotIt 绘制股价和roe关系，结合roeProcessTools使用
 '''
+from roeProcessTools import *
 import pandas as pd
 import numpy as np
 from scipy.stats import spearmanr
@@ -94,3 +96,36 @@ def getEarlyTime(time1: str, time2: str):
     time, str, like 2014-01
     '''
     return time1 if time1 < time2 else time2
+
+
+def plotIt(code, df: pd.DataFrame, mark: pd.DataFrame, title:str ="roe"):
+    '''
+    Description:
+    绘制股价和roe或cf等数据的图表
+    ---
+    Params:
+    df, DataFrame, roe 或cf数据
+    mark, DataFrame, 标记数据
+    title, str, 标记信息
+    ---
+    Returns:
+    '''
+    # 获取时间信息
+    markRow = mark[mark["code"].str.contains(code)]
+    startTime_roe = markRow.iloc[0, 3]
+    startTime_cf = markRow.iloc[0, 6]
+    earlyTime = getEarlyTime(startTime_roe, startTime_cf)
+    # 获取股价信息，注意股价文件放在data中
+    price = getPriceData(code, earlyTime)
+    price["trade_date"] = pd.to_datetime(price["trade_date"], format="%Y%m%d")
+    yPrice = price["close"]
+    xPrice = [each.date() for each in price["trade_date"]]
+    # 获取公司数据信息，取2010-03之后的数据
+    company = df[df["code"].str.contains(code)]
+    company = company.dropna(axis=1)
+    idx = company.columns.get_indexer(("2010-03",))[0]
+    temp = pd.concat([company.iloc[:, :2], company.iloc[:, idx:]], axis=1)
+    fig, axs = showOne(code, temp, marked=title, center=False)
+    ax2 = axs.twinx()
+    ax2.plot(xPrice, yPrice, label="price", c="crimson")
+    ax2.legend()

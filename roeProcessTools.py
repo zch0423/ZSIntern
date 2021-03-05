@@ -412,12 +412,13 @@ def mark(df, n=8, center=False, gaussian=True, order=4, threshold=0.8, highPct=7
 #     return pd.DataFrame(data={"code": codes, "name": names, "mark": marks})
 
 
-def drawROEandExtreme(maxs, mins, y, yRolling, company, minBool=True, maxBool=True, roeBool=True, mark=None):
+def drawROEandExtreme(axs, maxs, mins, y, yRolling, company, minBool=True, maxBool=True, roeBool=True, mark=None):
     '''
     Description:
     绘制ROE，平滑线和标注极点
     ---
     Params:
+    axs, plt.subplots
     maxs, Series, 极大值点
     mins, Series, 极小值点
     y, Series
@@ -430,7 +431,7 @@ def drawROEandExtreme(maxs, mins, y, yRolling, company, minBool=True, maxBool=Tr
     ---
     Returns:
     '''
-    fig, axs = plt.subplots(figsize=(12, 5))
+    # fig, axs = plt.subplots(figsize=(12, 5))
     
     # y = company.iloc[0, 2:]
     if roeBool:
@@ -455,18 +456,22 @@ def drawROEandExtreme(maxs, mins, y, yRolling, company, minBool=True, maxBool=Tr
     axs.legend()
 
 
-def showOne(code, data, marked=None, n=8, gaussian=True, center=True, order=4, maxBool=True, minBool=True, roeBool=True):
+def showOne(code, data, marked=None, n=8, gaussian=True, center=False, order=4, maxBool=True, minBool=True, roeBool=True, cfBool=False):
     '''
     Description:
     根据code绘制某一公司的roe，趋势以及极值点，为drawROEandExtreme的封装
     Jan 20, 2021 16:30
     增加了mark标注在title上
+    Mar 5, 2021 10:40
+    将图表fig, axs返回用于添加内容
     ---
     Params:
     code, string
     data, DataFrame
+    cfBool, bool, default False 是否是现金流数据，表示在标题上
     ---
     Returns:
+    fig, axs
     '''
     company, y = getCompanyByCode(code, data)
     yRolling = getYRolling(y, n=n, gaussian=gaussian, center=center)
@@ -474,12 +479,16 @@ def showOne(code, data, marked=None, n=8, gaussian=True, center=True, order=4, m
     maximum, minimum = getExtreme(yRolling, order)
     maxs, mins = yRolling[maximum], yRolling[minimum]
     mark = None
-    if marked is not None:
+    if isinstance(marked, str):
+        # 标记信息
+        mark = marked
+    elif marked is not None:
         _, mark = getCompanyByCode(code, marked)
         mark = mark[0]
-    drawROEandExtreme(maxs, mins, y, yRolling, company,
+    fig, axs = plt.subplots(figsize=(12, 5))
+    drawROEandExtreme(axs, maxs, mins, y, yRolling, company,
                       maxBool, minBool, roeBool, mark)
-
+    return fig, axs
 
 def selectGood(data, n=1.5, minExtreme=4, proportion=0.2):
     '''
