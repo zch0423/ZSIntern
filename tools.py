@@ -54,7 +54,7 @@ def correlate(startTime: str, df: pd.DataFrame, price: pd.DataFrame) -> float:
     return pearson, spearman
 
     
-def getPriceData(code: str, startTime: str, endTime: str = "20201231", saveBool: bool = True):
+def getPriceData(code: str, startTime: str, endTime: str = "20201231", saveBool: bool = True, dataPath: str = "/Users/zch/Desktop/internship/Mar04/data/"):
     '''
     Description:
     根据code时间等从tushare获取股价信息
@@ -64,11 +64,12 @@ def getPriceData(code: str, startTime: str, endTime: str = "20201231", saveBool:
     startTime, str, like 2014-01
     endTime, str, like 20201231
     saveBool, bool, whether to save data as csv file, outfile named by code and starttime
+    dataPath, str, path storing the data
     ---
     Returns:
     price
     '''
-    outpath = f"data/{code[:-3]}-{startTime}.csv"
+    outpath = f"{dataPath}{code[:-3]}-{startTime}.csv"
     if os.path.exists(outpath):
         # print("downloaded in", outpath)
         price = pd.read_csv(outpath)
@@ -78,8 +79,8 @@ def getPriceData(code: str, startTime: str, endTime: str = "20201231", saveBool:
     price = ts.pro_bar(ts_code=code, adj='qfq',
                        start_date=st, end_date=endTime)
     if saveBool:
-        if not os.path.exists("data/"):
-            os.mkdir("data/")
+        if not os.path.exists(dataPath):
+            os.mkdir(dataPath)
         price.to_csv(outpath, index=False)
     return price
 
