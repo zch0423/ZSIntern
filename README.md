@@ -56,3 +56,4 @@
 
 ## Apr 06
 - [x] sina news crawler 
+- [x] sohu news crawler 

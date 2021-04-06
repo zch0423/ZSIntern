@@ -59,7 +59,7 @@ def data2csv(data, filename: "str | None" =None):
     Returns:
     '''
     if filename is None:
-        filename = time.strftime("%Y%m%d_%H%Mnews.csv", time.localtime())
+        filename = time.strftime("%Y%m%d_%H%Msina.csv", time.localtime())
     # 导出字段
     keys = ["oid", "hqChart", "title", "ctime", "lids", "url", "intro", "wapurl"]
     output = []
