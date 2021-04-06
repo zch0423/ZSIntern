@@ -30,11 +30,16 @@ def getNews(page:int =1, lid:int = 2509):
     ---
     Params:
     page, int default 1, 页数
-    lid, int default 2509, 类别 2509表示全部类别
+    lid, int default 2509, 类别
+    2509，全部/ 2510，国内/ 2511，国际/ 2669，社会/ 
+    2512，体育/ 2513，娱乐/ 2514，军事/ 2515，科技/ 
+    2516，财经/ 2517，股市/ 2518，美股/
     ---
     Returns:
     data, dict, 包含50条新闻的json信息
     '''
+    if lid!=2669 and (lid<2509 or lid>2518):
+        lid = 2509  # 默认选取全部
     r = random.random()
     _ = int(time.time())
     url = f"https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid={lid}&num=50&page={page}&r={r:.16f}&_={_}"
@@ -56,10 +61,14 @@ def data2csv(data, filename: "str | None" =None):
     if filename is None:
         filename = time.strftime("%Y%m%d_%H%Mnews.csv", time.localtime())
     # 导出字段
-    keys = ["oid", "title", "ctime", "lids", "url", "intro", "wapurl"]
+    keys = ["oid", "hqChart", "title", "ctime", "lids", "url", "intro", "wapurl"]
     output = []
     for row in data:
-        output.append([row[k] for k in keys])
+        temp = [row[k] for k in keys]
+        # 股票代码信息
+        s = json.loads(temp[1])
+        temp[1] = s["stockMarket"]+"-"+s["stockCode"]
+        output.append(temp)
     with open(filename, "w") as f:
         csv_writer = csv.writer(f)
         csv_writer.writerow(keys)
@@ -67,4 +76,5 @@ def data2csv(data, filename: "str | None" =None):
 
 
 if __name__ == "__main__":
-    data2csv(getNews())
+    # data2csv(getNews(lid=2516))  # 财经新闻
+    data2csv(getNews(lid=2517))  # 股市新闻
