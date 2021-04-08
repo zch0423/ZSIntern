@@ -54,6 +54,9 @@
 ## Mar 18
 - [x] 获取信息以及绘制的程序
 
+## Apr 01
+- [x] tushare news and baostock 
+
 ## Apr 06
 - [x] sina news crawler 
 - [x] sohu news crawler 
